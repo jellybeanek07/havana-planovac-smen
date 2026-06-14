@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin - Plánovač směn</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   * { box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -26,7 +25,6 @@
 </head>
 <body>
 <div class="container">
-
   <div id="view-login">
     <h1>Admin přihlášení</h1>
     <label>Heslo</label>
@@ -34,3 +32,147 @@
     <p id="login-error">Špatné heslo.</p>
     <button class="primary" id="login-btn">Přihlásit</button>
   </div>
+
+  <div id="view-admin" style="display:none;">
+    <h1>Rozvrh směn</h1>
+    <p style="font-size:13px; color:#555;">Požadavky na volno</p>
+    <div id="admin-requests"></div>
+    <label>Filtr oddělení</label>
+    <select id="admin-dept-filter">
+      <option value="all">Vše</option>
+      <option value="bar">Bar</option>
+      <option value="kuchyne">Kuchyně</option>
+    </select>
+    <div style="overflow-x:auto; margin-top:12px;">
+      <table id="admin-table"></table>
+    </div>
+    <div class="actions">
+      <button id="admin-export">Export obrázku</button>
+      <button id="admin-reset">Reset vše</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SUPABASE_URL = "https://lspatclvnviuvlaoojho.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_R8E2ADPtvy6KNdjN0u4Kqw_9F9wf2Cn";
+const ADMIN_PASSWORD = "havana2026";
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const DAYS = ['Po','Út','St','Čt','Pá','So','Ne'];
+
+document.getElementById('login-btn').onclick = () => {
+  const pass = document.getElementById('admin-password').value;
+  if (pass === ADMIN_PASSWORD) {
+    document.getElementById('view-login').style.display = 'none';
+    document.getElementById('view-admin').style.display = 'block';
+    loadAdmin();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+};
+
+document.getElementById('admin-dept-filter').onchange = loadAdmin;
+document.getElementById('admin-export').onclick = exportImage;
+document.getElementById('admin-reset').onclick = resetAll;
+
+async function loadAdmin() {
+  const { data: requests, error: err1 } = await sb.from('shift_requests').select('*');
+  const { data: schedules, error: err2 } = await sb.from('shift_schedule').select('*');
+  if (err1 || err2) { alert('Chyba: ' + (err1?.message || err2?.message)); return; }
+  renderRequests(requests || []);
+  renderTable(requests || [], schedules || []);
+}
+
+function renderRequests(requests) {
+  const div = document.getElementById('admin-requests');
+  div.innerHTML = '';
+  if (requests.length === 0) {
+    div.innerHTML = '<p style="font-size:13px; color:#999;">Zatím žádné požadavky.</p>';
+    return;
+  }
+  requests.forEach(r => {
+    const offDays = r.off_days.map((v,i) => v ? DAYS[i] : null).filter(Boolean).join(', ') || '—';
+    const card = document.createElement('div');
+    card.className = 'req-card';
+    card.innerHTML = `<span><b>${r.name}</b> (${r.dept === 'bar' ? 'Bar' : 'Kuchyně'})</span><span>volno: ${offDays}</span>`;
+    div.appendChild(card);
+  });
+}
+
+function renderTable(requests, schedules) {
+  const filter = document.getElementById('admin-dept-filter').value;
+  const table = document.getElementById('admin-table');
+  table.innerHTML = '';
+  const filtered = requests.filter(r => filter === 'all' || r.dept === filter);
+  if (filtered.length === 0) {
+    table.innerHTML = '<tr><td style="padding:8px;">Žádní zaměstnanci v tomto filtru.</td></tr>';
+    return;
+  }
+  const thead = document.createElement('tr');
+  thead.innerHTML = '<th>Jméno</th>' + DAYS.map(d => `<th>${d}</th>`).join('');
+  table.appendChild(thead);
+  filtered.forEach(r => {
+    const sched = schedules.find(s => s.name === r.name);
+    const work = sched ? sched.work_days : [false,false,false,false,false,false,false];
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    nameCell.innerHTML = `<b>${r.name}</b><br><span style="font-size:10px; color:#888;">${r.dept === 'bar' ? 'Bar' : 'Kuchyně'}</span>`;
+    nameCell.style.textAlign = 'left';
+    row.appendChild(nameCell);
+    DAYS.forEach((d, i) => {
+      const td = document.createElement('td');
+      if (r.off_days[i]) {
+        td.className = 'off-cell';
+        td.textContent = '–';
+      } else {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!work[i];
+        cb.onchange = () => saveSchedule(r.name, i, cb.checked, [...work]);
+        td.appendChild(cb);
+      }
+      row.appendChild(td);
+    });
+    table.appendChild(row);
+  });
+}
+
+async function saveSchedule(name, dayIndex, checked, work) {
+  work[dayIndex] = checked;
+  const { error } = await sb.from('shift_schedule').upsert({ name, work_days: work }, { onConflict: 'name' });
+  if (error) alert('Chyba: ' + error.message);
+}
+
+async function exportImage() {
+  const table = document.getElementById('admin-table');
+  const clone = table.cloneNode(true);
+  clone.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    const span = document.createElement('span');
+    span.textContent = cb.checked ? 'X' : '';
+    span.style.fontWeight = 'bold';
+    cb.replaceWith(span);
+  });
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'background:#fff; padding:16px; display:inline-block;';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+  const canvas = await html2canvas(wrapper, { backgroundColor: '#ffffff' });
+  document.body.removeChild(wrapper);
+  const link = document.createElement('a');
+  link.download = 'rozvrh.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+async function resetAll() {
+  if (!confirm('Opravdu smazat všechny požadavky a rozvrh?')) return;
+  await sb.from('shift_requests').delete().neq('name', '');
+  await sb.from('shift_schedule').delete().neq('name', '');
+  loadAdmin();
+}
+</script>
+</body>
+</html>
