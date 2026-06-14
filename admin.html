@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin - Plánovač směn</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  * { box-sizing: border-box; font-family: Arial, sans-serif; }
+  body { margin: 0; padding: 16px; background: #f4f4f4; color: #222; }
+  .container { max-width: 700px; margin: 0 auto; }
+  h1 { font-size: 20px; }
+  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+  input[type=text], input[type=password], select { width: 100%; padding: 10px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+  button.primary { width: 100%; padding: 12px; background: #333; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; }
+  th, td { border: 1px solid #ddd; padding: 6px 4px; text-align: center; }
+  th { background: #eee; font-weight: 600; }
+  .req-card { border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font-size: 12px; display: flex; justify-content: space-between; margin-bottom: 6px; background: #fff; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+  .actions button { flex: 1; padding: 10px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .off-cell { background: #f0f0f0; color: #999; }
+  #login-error { color: #b00020; font-size: 13px; margin-top: -8px; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div id="view-login">
+    <h1>Admin přihlášení</h1>
+    <label>Heslo</label>
+    <input type="password" id="admin-password" />
+    <p id="login-error">Špatné heslo.</p>
+    <button class="primary" id="login-btn">Přihlásit</button>
+  </div>
