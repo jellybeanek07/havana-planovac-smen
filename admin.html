@@ -3,176 +3,398 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin - Plánovač směn</title>
+<title>Admin – Plánovač směn</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-  * { box-sizing: border-box; font-family: Arial, sans-serif; }
-  body { margin: 0; padding: 16px; background: #f4f4f4; color: #222; }
-  .container { max-width: 700px; margin: 0 auto; }
-  h1 { font-size: 20px; }
-  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
-  input[type=text], input[type=password], select { width: 100%; padding: 10px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
-  button.primary { width: 100%; padding: 12px; background: #333; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; }
-  th, td { border: 1px solid #ddd; padding: 6px 4px; text-align: center; }
-  th { background: #eee; font-weight: 600; }
-  .req-card { border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font-size: 12px; display: flex; justify-content: space-between; margin-bottom: 6px; background: #fff; }
-  .actions { display: flex; gap: 8px; margin-top: 16px; }
-  .actions button { flex: 1; padding: 10px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; font-size: 14px; }
-  .off-cell { background: #f0f0f0; color: #999; }
-  #login-error { color: #b00020; font-size: 13px; margin-top: -8px; margin-bottom: 12px; display: none; }
+  * { box-sizing: border-box; font-family: -apple-system, Arial, sans-serif; }
+  body { margin: 0; background: #f0f2f5; color: #1a1a1a; }
+  .header { background: #1a1a2e; color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { margin: 0; font-size: 20px; }
+  .logout-btn { background: rgba(255,255,255,0.15); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card h2 { margin: 0 0 12px; font-size: 15px; color: #444; }
+  input[type=text], input[type=password], input[type=date], select, input[type=number] { padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+  input:focus, select:focus { border-color: #1a1a2e; }
+  .btn { padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-dark { background: #1a1a2e; color: white; }
+  .btn-outline { background: white; border: 1.5px solid #ddd; color: #333; }
+  .btn-danger { background: #fdecea; color: #b00020; border: 1.5px solid #f5c6c6; }
+  .btn-export { background: #e8f4fd; color: #1a6fa8; border: 1.5px solid #b8d9f5; }
+  .week-badge { display: inline-block; background: #e8f4fd; color: #1a6fa8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
+  #view-login { max-width: 360px; margin: 60px auto; }
+  #login-error { color: #b00020; font-size: 13px; display: none; margin-bottom: 8px; }
+  .req-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .req-card { border: 1.5px solid #eee; border-radius: 10px; padding: 12px; }
+  .req-card .name { font-weight: 700; font-size: 14px; }
+  .req-card .dept { font-size: 12px; color: #888; margin-bottom: 8px; }
+  .available { color: #1a7a40; font-weight: 600; }
+  .day-avail { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+  .day-avail:last-child { border: none; }
+  .delete-emp { float: right; background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; padding: 0; }
+  .delete-emp:hover { color: #b00020; }
+  .schedule-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .schedule-table th { background: #f5f5f5; padding: 8px 6px; text-align: left; border-bottom: 2px solid #eee; font-size: 12px; }
+  .schedule-table td { padding: 6px; border-bottom: 1px solid #f5f5f5; vertical-align: top; }
+  .shift-slot { display: flex; align-items: center; gap: 6px; background: #f9f9f9; border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; font-size: 12px; }
+  .dept-badge { border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; }
+  .badge-bar { background: #dbeafe; color: #1d4ed8; }
+  .badge-kuchyne { background: #fef3c7; color: #b45309; }
+  .time-input { width: 80px; padding: 3px 6px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; }
+  .remove-shift { background: none; border: none; color: #ccc; cursor: pointer; font-size: 14px; margin-left: auto; }
+  .remove-shift:hover { color: #b00020; }
+  .add-shift-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  .add-shift-row select { padding: 5px 8px; font-size: 12px; border-radius: 6px; }
+  .add-shift-row button { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+  .coverage-bar { display: flex; gap: 8px; margin-top: 6px; font-size: 12px; }
+  .cov-badge { padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+  .cov-ok { background: #e6f9ee; color: #1a7a40; }
+  .cov-warn { background: #fdecea; color: #b00020; }
+  .week-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .week-tab { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ddd; background: white; cursor: pointer; font-size: 13px; }
+  .week-tab.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+  #export-preview { display: none; position: fixed; top: -9999px; }
+  #export-table { border-collapse: collapse; font-size: 12px; background: white; }
+  #export-table th, #export-table td { border: 1px solid #ccc; padding: 6px 10px; }
+  #export-table th { background: #1a1a2e; color: white; }
+  .exp-bar { background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+  .exp-kuchyne { background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px; }
 </style>
 </head>
 <body>
-<div class="container">
-  <div id="view-login">
-    <h1>Admin přihlášení</h1>
-    <label>Heslo</label>
-    <input type="password" id="admin-password" />
-    <p id="login-error">Špatné heslo.</p>
-    <button class="primary" id="login-btn">Přihlásit</button>
+<div id="view-login">
+  <div class="card">
+    <h2>🔒 Admin přihlášení</h2>
+    <p id="login-error">Špatné heslo, zkus to znovu.</p>
+    <input type="password" id="admin-password" placeholder="Heslo" style="width:100%; margin-bottom:10px;" />
+    <button class="btn btn-dark" style="width:100%;" id="login-btn">Přihlásit se</button>
   </div>
-
-  <div id="view-admin" style="display:none;">
-    <h1>Rozvrh směn</h1>
-    <p style="font-size:13px; color:#555;">Požadavky na volno</p>
-    <div id="admin-requests"></div>
-    <label>Filtr oddělení</label>
-    <select id="admin-dept-filter">
-      <option value="all">Vše</option>
-      <option value="bar">Bar</option>
-      <option value="kuchyne">Kuchyně</option>
-    </select>
-    <div style="overflow-x:auto; margin-top:12px;">
-      <table id="admin-table"></table>
+</div>
+<div id="view-admin" style="display:none;">
+  <div class="header">
+    <h1>⚙️ Admin – Plánovač směn</h1>
+    <button class="logout-btn" id="logout-btn">Odhlásit</button>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h2>📆 Nastavení týdne</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <div>
+          <label style="font-size:12px; color:#888; display:block; margin-bottom:3px;">Pondělí plánovaného týdne</label>
+          <input type="date" id="week-picker" />
+        </div>
+        <button class="btn btn-dark" id="set-week-btn" style="align-self:flex-end;">Nastavit týden</button>
+        <div id="active-week-badge" style="align-self:flex-end;"></div>
+      </div>
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; align-items:flex-end;">
+        <div>
+          <label style="font-size:12px; color:#888; display:block; margin-bottom:3px;">Min. počet – Bar</label>
+          <input type="number" id="min-bar" min="0" max="10" value="1" style="width:70px;" />
+        </div>
+        <div>
+          <label style="font-size:12px; color:#888; display:block; margin-bottom:3px;">Min. počet – Kuchyně</label>
+          <input type="number" id="min-kuchyne" min="0" max="10" value="1" style="width:70px;" />
+        </div>
+        <button class="btn btn-outline" id="save-minimums-btn">Uložit minimum</button>
+      </div>
     </div>
-    <div class="actions">
-      <button id="admin-export">Export obrázku</button>
-      <button id="admin-reset">Reset vše</button>
+    <div class="card">
+      <h2>🕐 Historie týdnů</h2>
+      <div class="week-tabs" id="week-tabs"></div>
+      <p id="no-history" style="font-size:13px; color:#999; display:none;">Zatím žádná data.</p>
+    </div>
+    <div class="card">
+      <h2>👥 Dostupnost zaměstnanců <span id="requests-week-label" style="font-size:13px; font-weight:400; color:#888;"></span></h2>
+      <div class="req-grid" id="admin-requests"></div>
+    </div>
+    <div class="card">
+      <h2>📋 Rozvrh směn</h2>
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+        <button class="btn btn-export" id="export-btn">📸 Export obrázku</button>
+        <button class="btn btn-danger" id="reset-week-btn">🗑️ Smazat rozvrh tohoto týdne</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="schedule-table" id="schedule-table"></table>
+      </div>
     </div>
   </div>
 </div>
-
+<div id="export-preview">
+  <table id="export-table"></table>
+</div>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
 const SUPABASE_URL = "https://lspatclvnviuvlaoojho.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_R8E2ADPtvy6KNdjN0u4Kqw_9F9wf2Cn";
 const ADMIN_PASSWORD = "havana2026";
-
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const DAYS = ['Po','Út','St','Čt','Pá','So','Ne'];
-
+const DAY_NAMES = ['Po','Út','St','Čt','Pá','So','Ne'];
+const DAY_NAMES_FULL = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'];
+let currentWeek = null;
+let allRequests = [];
+let scheduleData = {};
+let minBar = 1, minKuchyne = 1;
 document.getElementById('login-btn').onclick = () => {
-  const pass = document.getElementById('admin-password').value;
-  if (pass === ADMIN_PASSWORD) {
+  if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
     document.getElementById('view-login').style.display = 'none';
     document.getElementById('view-admin').style.display = 'block';
-    loadAdmin();
+    initAdmin();
   } else {
     document.getElementById('login-error').style.display = 'block';
   }
 };
-
-document.getElementById('admin-dept-filter').onchange = loadAdmin;
-document.getElementById('admin-export').onclick = exportImage;
-document.getElementById('admin-reset').onclick = resetAll;
-
-async function loadAdmin() {
-  const { data: requests, error: err1 } = await sb.from('shift_requests').select('*');
-  const { data: schedules, error: err2 } = await sb.from('shift_schedule').select('*');
-  if (err1 || err2) { alert('Chyba: ' + (err1?.message || err2?.message)); return; }
-  renderRequests(requests || []);
-  renderTable(requests || [], schedules || []);
+document.getElementById('admin-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+});
+document.getElementById('logout-btn').onclick = () => {
+  document.getElementById('view-login').style.display = 'block';
+  document.getElementById('view-admin').style.display = 'none';
+};
+async function initAdmin() {
+  const { data: settings } = await sb.from('settings').select('*');
+  if (settings) {
+    const aw = settings.find(s => s.key === 'active_week');
+    if (aw) { currentWeek = aw.value; document.getElementById('week-picker').value = aw.value; }
+    const mb = settings.find(s => s.key === 'min_bar');
+    if (mb) { minBar = parseInt(mb.value); document.getElementById('min-bar').value = minBar; }
+    const mk = settings.find(s => s.key === 'min_kuchyne');
+    if (mk) { minKuchyne = parseInt(mk.value); document.getElementById('min-kuchyne').value = minKuchyne; }
+  }
+  if (currentWeek) updateActiveWeekBadge();
+  await loadAll();
 }
-
-function renderRequests(requests) {
-  const div = document.getElementById('admin-requests');
-  div.innerHTML = '';
-  if (requests.length === 0) {
-    div.innerHTML = '<p style="font-size:13px; color:#999;">Zatím žádné požadavky.</p>';
+async function loadAll() {
+  const { data: requests } = await sb.from('shift_requests').select('*');
+  allRequests = requests || [];
+  const { data: schedules } = await sb.from('shift_schedule').select('*');
+  scheduleData = {};
+  (schedules || []).forEach(s => {
+    if (!scheduleData[s.week]) scheduleData[s.week] = {};
+    scheduleData[s.week][s.name] = s.shifts;
+  });
+  renderWeekTabs();
+  if (currentWeek) { renderRequests(); renderSchedule(); }
+}
+document.getElementById('set-week-btn').onclick = async () => {
+  const val = document.getElementById('week-picker').value;
+  if (!val) { alert('Vyber datum'); return; }
+  const d = new Date(val);
+  if (d.getDay() !== 1) { alert('Vyber prosím pondělí!'); return; }
+  currentWeek = val;
+  await sb.from('settings').upsert({ key: 'active_week', value: val }, { onConflict: 'key' });
+  updateActiveWeekBadge();
+  renderWeekTabs();
+  renderRequests();
+  renderSchedule();
+};
+document.getElementById('save-minimums-btn').onclick = async () => {
+  minBar = parseInt(document.getElementById('min-bar').value) || 1;
+  minKuchyne = parseInt(document.getElementById('min-kuchyne').value) || 1;
+  await sb.from('settings').upsert({ key: 'min_bar', value: String(minBar) }, { onConflict: 'key' });
+  await sb.from('settings').upsert({ key: 'min_kuchyne', value: String(minKuchyne) }, { onConflict: 'key' });
+  renderSchedule();
+};
+function updateActiveWeekBadge() {
+  if (!currentWeek) return;
+  const dates = getWeekDates(currentWeek);
+  document.getElementById('active-week-badge').innerHTML = `<span class="week-badge">Aktivní: ${formatDate(dates[0])} – ${formatDate(dates[6])}</span>`;
+  document.getElementById('requests-week-label').textContent = `– ${formatDate(dates[0])} – ${formatDate(dates[6])}`;
+}
+function renderWeekTabs() {
+  const weeks = [...new Set([...allRequests.map(r => r.week), ...Object.keys(scheduleData), currentWeek].filter(Boolean))].sort().reverse();
+  const container = document.getElementById('week-tabs');
+  const noHistory = document.getElementById('no-history');
+  container.innerHTML = '';
+  if (weeks.length === 0) { noHistory.style.display = 'block'; return; }
+  noHistory.style.display = 'none';
+  weeks.forEach(w => {
+    const dates = getWeekDates(w);
+    const btn = document.createElement('button');
+    btn.className = 'week-tab' + (w === currentWeek ? ' active' : '');
+    btn.textContent = `${formatDate(dates[0])} – ${formatDate(dates[6])}`;
+    btn.onclick = () => {
+      currentWeek = w;
+      document.getElementById('week-picker').value = w;
+      updateActiveWeekBadge();
+      document.querySelectorAll('.week-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      renderRequests();
+      renderSchedule();
+    };
+    container.appendChild(btn);
+  });
+}
+function renderRequests() {
+  const container = document.getElementById('admin-requests');
+  container.innerHTML = '';
+  const weekRequests = allRequests.filter(r => r.week === currentWeek);
+  if (weekRequests.length === 0) {
+    container.innerHTML = '<p style="font-size:13px; color:#999;">Zatím nikdo nezadal dostupnost.</p>';
     return;
   }
-  requests.forEach(r => {
-    const offDays = r.off_days.map((v,i) => v ? DAYS[i] : null).filter(Boolean).join(', ') || '—';
+  const dates = getWeekDates(currentWeek);
+  weekRequests.forEach(r => {
     const card = document.createElement('div');
     card.className = 'req-card';
-    card.innerHTML = `<span><b>${r.name}</b> (${r.dept === 'bar' ? 'Bar' : 'Kuchyně'})</span><span>volno: ${offDays}</span>`;
-    div.appendChild(card);
+    const deptLabel = r.dept === 'bar' ? 'Jen Bar' : r.dept === 'kuchyne' ? 'Jen Kuchyně' : 'Bar i Kuchyně';
+    let daysHtml = '';
+    (r.days || []).forEach((day, i) => {
+      if (day.available) daysHtml += `<div class="day-avail"><span class="available">✓ ${DAY_NAMES[i]} ${formatDate(dates[i])}</span><span style="color:#888;">${day.note || ''}</span></div>`;
+    });
+    card.innerHTML = `
+      <button class="delete-emp" data-name="${r.name}" data-week="${r.week}">×</button>
+      <div class="name">${r.name}</div>
+      <div class="dept">${deptLabel}</div>
+      <div>${daysHtml || '<span style="color:#ccc; font-size:12px;">Žádná dostupnost</span>'}</div>
+    `;
+    card.querySelector('.delete-emp').onclick = async (e) => {
+      const name = e.target.dataset.name, week = e.target.dataset.week;
+      if (!confirm(`Smazat ${name}?`)) return;
+      await sb.from('shift_requests').delete().eq('name', name).eq('week', week);
+      allRequests = allRequests.filter(r => !(r.name === name && r.week === week));
+      renderRequests(); renderSchedule();
+    };
+    container.appendChild(card);
   });
 }
-
-function renderTable(requests, schedules) {
-  const filter = document.getElementById('admin-dept-filter').value;
-  const table = document.getElementById('admin-table');
+function renderSchedule() {
+  const table = document.getElementById('schedule-table');
   table.innerHTML = '';
-  const filtered = requests.filter(r => filter === 'all' || r.dept === filter);
-  if (filtered.length === 0) {
-    table.innerHTML = '<tr><td style="padding:8px;">Žádní zaměstnanci v tomto filtru.</td></tr>';
-    return;
-  }
+  const dates = getWeekDates(currentWeek);
+  const weekRequests = allRequests.filter(r => r.week === currentWeek);
+  const weekSchedule = scheduleData[currentWeek] || {};
   const thead = document.createElement('tr');
-  thead.innerHTML = '<th>Jméno</th>' + DAYS.map(d => `<th>${d}</th>`).join('');
+  thead.innerHTML = '<th style="width:130px;">Den</th><th>Přiřazené směny</th><th style="width:210px;">Přidat směnu</th>';
   table.appendChild(thead);
-  filtered.forEach(r => {
-    const sched = schedules.find(s => s.name === r.name);
-    const work = sched ? sched.work_days : [false,false,false,false,false,false,false];
+  dates.forEach((date, dayIdx) => {
+    const tr = document.createElement('tr');
+    const tdDay = document.createElement('td');
+    tdDay.innerHTML = `<b>${DAY_NAMES_FULL[dayIdx]}</b><br><span style="font-size:11px; color:#888;">${formatDate(date)}</span>`;
+    const tdShifts = document.createElement('td');
+    const shiftsContainer = document.createElement('div');
+    let countBar = 0, countKuchyne = 0;
+    Object.entries(weekSchedule).forEach(([name, shifts]) => {
+      const shift = shifts[dayIdx];
+      if (!shift || !shift.dept) return;
+      if (shift.dept === 'bar') countBar++;
+      if (shift.dept === 'kuchyne') countKuchyne++;
+      const slot = document.createElement('div');
+      slot.className = 'shift-slot';
+      slot.innerHTML = `
+        <span class="dept-badge ${shift.dept === 'bar' ? 'badge-bar' : 'badge-kuchyne'}">${shift.dept === 'bar' ? 'Bar' : 'Kuchyně'}</span>
+        <span style="font-weight:600;">${name}</span>
+        <input type="text" class="time-input" placeholder="8:00–16:00" value="${shift.time || ''}" />
+        <button class="remove-shift" data-name="${name}" data-day="${dayIdx}">×</button>
+      `;
+      slot.querySelector('.time-input').onchange = async (e) => { await saveShift(name, dayIdx, shift.dept, e.target.value); };
+      slot.querySelector('.remove-shift').onclick = async () => { await saveShift(name, dayIdx, null, ''); renderSchedule(); };
+      shiftsContainer.appendChild(slot);
+    });
+    const covDiv = document.createElement('div');
+    covDiv.className = 'coverage-bar';
+    covDiv.innerHTML = `
+      <span class="cov-badge ${countBar >= minBar ? 'cov-ok' : 'cov-warn'}">Bar: ${countBar}/${minBar}</span>
+      <span class="cov-badge ${countKuchyne >= minKuchyne ? 'cov-ok' : 'cov-warn'}">Kuchyně: ${countKuchyne}/${minKuchyne}</span>
+    `;
+    tdShifts.appendChild(shiftsContainer);
+    tdShifts.appendChild(covDiv);
+    const tdAdd = document.createElement('td');
+    const availableForDay = weekRequests.filter(r => r.days && r.days[dayIdx] && r.days[dayIdx].available);
+    if (availableForDay.length === 0) {
+      tdAdd.innerHTML = '<span style="font-size:12px; color:#ccc;">Nikdo dostupný</span>';
+    } else {
+      const addRow = document.createElement('div');
+      addRow.className = 'add-shift-row';
+      const nameSelect = document.createElement('select');
+      nameSelect.innerHTML = '<option value="">-- Jméno --</option>';
+      availableForDay.forEach(r => {
+        const alreadyAssigned = weekSchedule[r.name] && weekSchedule[r.name][dayIdx] && weekSchedule[r.name][dayIdx].dept;
+        const note = r.days[dayIdx].note ? ` (${r.days[dayIdx].note})` : '';
+        const opt = document.createElement('option');
+        opt.value = r.name;
+        opt.textContent = r.name + note + (alreadyAssigned ? ' ✓' : '');
+        nameSelect.appendChild(opt);
+      });
+      const deptSelect = document.createElement('select');
+      deptSelect.innerHTML = '<option value="bar">Bar</option><option value="kuchyne">Kuchyně</option>';
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn btn-dark';
+      addBtn.textContent = '+ Přidat';
+      addBtn.onclick = async () => {
+        const name = nameSelect.value;
+        if (!name) { alert('Vyber jméno'); return; }
+        await saveShift(name, dayIdx, deptSelect.value, '');
+        renderSchedule();
+      };
+      addRow.appendChild(nameSelect);
+      addRow.appendChild(deptSelect);
+      addRow.appendChild(addBtn);
+      tdAdd.appendChild(addRow);
+    }
+    tr.appendChild(tdDay); tr.appendChild(tdShifts); tr.appendChild(tdAdd);
+    table.appendChild(tr);
+  });
+}
+async function saveShift(name, dayIdx, dept, time) {
+  if (!scheduleData[currentWeek]) scheduleData[currentWeek] = {};
+  if (!scheduleData[currentWeek][name]) scheduleData[currentWeek][name] = Array(7).fill(null).map(() => ({ dept: null, time: '' }));
+  scheduleData[currentWeek][name][dayIdx] = { dept, time };
+  await sb.from('shift_schedule').upsert({ name, week: currentWeek, shifts: scheduleData[currentWeek][name] }, { onConflict: 'name,week' });
+}
+document.getElementById('export-btn').onclick = async () => {
+  const dates = getWeekDates(currentWeek);
+  const weekSchedule = scheduleData[currentWeek] || {};
+  const expTable = document.getElementById('export-table');
+  expTable.innerHTML = '';
+  const titleRow = document.createElement('tr');
+  const titleCell = document.createElement('th');
+  titleCell.colSpan = 8;
+  titleCell.textContent = `Rozvrh směn: ${formatDate(dates[0])} – ${formatDate(dates[6])}`;
+  titleCell.style.textAlign = 'center';
+  titleRow.appendChild(titleCell);
+  expTable.appendChild(titleRow);
+  const thead = document.createElement('tr');
+  thead.innerHTML = '<th>Zaměstnanec</th>' + DAY_NAMES.map((d,i) => `<th>${d}<br><span style="font-weight:400; font-size:10px;">${formatDate(dates[i])}</span></th>`).join('');
+  expTable.appendChild(thead);
+  Object.entries(weekSchedule).forEach(([name, shifts]) => {
     const row = document.createElement('tr');
     const nameCell = document.createElement('td');
-    nameCell.innerHTML = `<b>${r.name}</b><br><span style="font-size:10px; color:#888;">${r.dept === 'bar' ? 'Bar' : 'Kuchyně'}</span>`;
-    nameCell.style.textAlign = 'left';
+    nameCell.textContent = name;
+    nameCell.style.fontWeight = '600';
     row.appendChild(nameCell);
-    DAYS.forEach((d, i) => {
+    shifts.forEach(shift => {
       const td = document.createElement('td');
-      if (r.off_days[i]) {
-        td.className = 'off-cell';
-        td.textContent = '–';
-      } else {
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = !!work[i];
-        cb.onchange = () => saveSchedule(r.name, i, cb.checked, [...work]);
-        td.appendChild(cb);
-      }
+      if (shift && shift.dept) {
+        const badge = document.createElement('span');
+        badge.className = shift.dept === 'bar' ? 'exp-bar' : 'exp-kuchyne';
+        badge.textContent = shift.dept === 'bar' ? 'Bar' : 'Kuchyně';
+        td.appendChild(badge);
+        if (shift.time) { td.appendChild(document.createElement('br')); td.appendChild(document.createTextNode(shift.time)); }
+      } else { td.textContent = '–'; td.style.color = '#ccc'; }
       row.appendChild(td);
     });
-    table.appendChild(row);
+    expTable.appendChild(row);
   });
-}
-
-async function saveSchedule(name, dayIndex, checked, work) {
-  work[dayIndex] = checked;
-  const { error } = await sb.from('shift_schedule').upsert({ name, work_days: work }, { onConflict: 'name' });
-  if (error) alert('Chyba: ' + error.message);
-}
-
-async function exportImage() {
-  const table = document.getElementById('admin-table');
-  const clone = table.cloneNode(true);
-  clone.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    const span = document.createElement('span');
-    span.textContent = cb.checked ? 'X' : '';
-    span.style.fontWeight = 'bold';
-    cb.replaceWith(span);
-  });
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'background:#fff; padding:16px; display:inline-block;';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
-  const canvas = await html2canvas(wrapper, { backgroundColor: '#ffffff' });
-  document.body.removeChild(wrapper);
+  const preview = document.getElementById('export-preview');
+  preview.style.display = 'block';
+  const canvas = await html2canvas(expTable, { backgroundColor: '#ffffff', scale: 2 });
+  preview.style.display = 'none';
   const link = document.createElement('a');
-  link.download = 'rozvrh.png';
+  link.download = `rozvrh_${currentWeek}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
+};
+document.getElementById('reset-week-btn').onclick = async () => {
+  if (!confirm('Smazat celý rozvrh pro tento týden?')) return;
+  await sb.from('shift_schedule').delete().eq('week', currentWeek);
+  if (scheduleData[currentWeek]) delete scheduleData[currentWeek];
+  renderSchedule();
+};
+function getWeekDates(mondayStr) {
+  const monday = new Date(mondayStr);
+  return Array.from({length:7}, (_,i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
 }
-
-async function resetAll() {
-  if (!confirm('Opravdu smazat všechny požadavky a rozvrh?')) return;
-  await sb.from('shift_requests').delete().neq('name', '');
-  await sb.from('shift_schedule').delete().neq('name', '');
-  loadAdmin();
-}
+function formatDate(d) { return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`; }
 </script>
 </body>
 </html>
