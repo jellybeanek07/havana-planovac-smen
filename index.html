@@ -3,61 +3,119 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Zadat volno - Plánovač směn</title>
+<title>Zadej dostupnost</title>
 <style>
-  * { box-sizing: border-box; font-family: Arial, sans-serif; }
-  body { margin: 0; padding: 16px; background: #f4f4f4; color: #222; }
-  .container { max-width: 500px; margin: 0 auto; }
-  h1 { font-size: 20px; }
-  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
-  input[type=text], select { width: 100%; padding: 10px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
-  .days { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
-  .days label { display: flex; align-items: center; gap: 8px; border: 1px solid #ccc; border-radius: 6px; padding: 12px; font-size: 14px; margin: 0; background: #fff; cursor: pointer; }
-  .days input { width: 18px; height: 18px; cursor: pointer; }
-  button.primary { width: 100%; padding: 12px; background: #333; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
-  #status { color: green; font-size: 14px; margin-top: 12px; display: none; text-align: center; }
-  #error { color: #b00020; font-size: 13px; margin-top: 12px; display: none; text-align: center; }
+  * { box-sizing: border-box; font-family: -apple-system, Arial, sans-serif; }
+  body { margin: 0; background: #f0f2f5; color: #1a1a1a; }
+  .header { background: #1a1a2e; color: white; padding: 16px 20px; }
+  .header h1 { margin: 0; font-size: 20px; }
+  .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.7; }
+  .container { max-width: 520px; margin: 0 auto; padding: 16px; }
+  .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card h2 { margin: 0 0 12px; font-size: 15px; color: #444; }
+  label.field-label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
+  input[type=text], select, textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; outline: none; transition: border 0.2s; }
+  input[type=text]:focus, select:focus, textarea:focus { border-color: #1a1a2e; }
+  textarea { resize: none; height: 60px; font-size: 13px; }
+  .week-badge { display: inline-block; background: #e8f4fd; color: #1a6fa8; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
+  .day-card { border: 1.5px solid #eee; border-radius: 10px; padding: 12px; margin-bottom: 10px; transition: border 0.2s; }
+  .day-card.selected { border-color: #1a6fa8; background: #f0f8ff; }
+  .day-header { display: flex; align-items: center; gap: 10px; }
+  .day-checkbox { width: 22px; height: 22px; cursor: pointer; accent-color: #1a1a2e; }
+  .day-name { font-size: 15px; font-weight: 600; }
+  .day-date { font-size: 13px; color: #888; margin-left: auto; }
+  .day-note { margin-top: 10px; display: none; }
+  .day-card.selected .day-note { display: block; }
+  button.submit-btn { width: 100%; padding: 14px; background: #1a1a2e; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  button.submit-btn:active { opacity: 0.85; }
+  #status { display: none; text-align: center; padding: 14px; border-radius: 10px; background: #e6f9ee; color: #1a7a40; font-weight: 600; font-size: 15px; margin-top: 12px; }
+  #error { display: none; text-align: center; padding: 14px; border-radius: 10px; background: #fdecea; color: #b00020; font-size: 14px; margin-top: 12px; }
+  .no-week { text-align: center; padding: 40px 20px; color: #888; font-size: 15px; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>Zadej svoje volno na příští týden</h1>
-  <label>Jméno</label>
-  <input type="text" id="emp-name" placeholder="Tvoje jméno" />
-  <label>Oddělení</label>
-  <select id="emp-dept">
-    <option value="bar">Bar</option>
-    <option value="kuchyne">Kuchyně</option>
-  </select>
-  <label>Zaškrtni dny, kdy NEMŮŽEŠ (volno):</label>
-  <div class="days" id="emp-days"></div>
-  <button class="primary" id="emp-submit">Odeslat požadavek</button>
-  <p id="status">Uloženo, děkujeme!</p>
-  <p id="error"></p>
+<div class="header">
+  <h1>📅 Plánovač směn</h1>
+  <p>Zadej kdy můžeš pracovat</p>
 </div>
-
+<div class="container">
+  <div id="no-week" class="card no-week" style="display:none;">
+    ⏳ Admin zatím nenastavil plánovaný týden. Zkus to znovu později.
+  </div>
+  <div id="main-form">
+    <div class="card">
+      <h2>Tvoje info</h2>
+      <label class="field-label">Jméno a příjmení</label>
+      <input type="text" id="emp-name" placeholder="Jana Nováková" />
+      <label class="field-label">Kde můžeš pracovat?</label>
+      <select id="emp-dept">
+        <option value="oboji">Bar i Kuchyně (obojí)</option>
+        <option value="bar">Jen Bar</option>
+        <option value="kuchyne">Jen Kuchyně</option>
+      </select>
+    </div>
+    <div class="card">
+      <h2>Dostupnost</h2>
+      <div class="week-badge" id="week-label">Načítám týden...</div>
+      <p style="font-size:13px; color:#666; margin: 0 0 12px;">Zaškrtni dny kdy <strong>MŮŽEŠ</strong> přijít. Případně přidej poznámku (např. "jen od 14h").</p>
+      <div id="days-container"></div>
+    </div>
+    <button class="submit-btn" id="emp-submit">✅ Odeslat dostupnost</button>
+    <div id="status">Odesláno! Děkujeme, dostupnost byla uložena.</div>
+    <div id="error"></div>
+  </div>
+</div>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
 const SUPABASE_URL = "https://lspatclvnviuvlaoojho.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_R8E2ADPtvy6KNdjN0u4Kqw_9F9wf2Cn";
-
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-const DAYS = ['Po','Út','St','Čt','Pá','So','Ne'];
-
-const empDaysDiv = document.getElementById('emp-days');
-DAYS.forEach((d, i) => {
-  const label = document.createElement('label');
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.className = 'off-day';
-  cb.dataset.day = i;
-  label.appendChild(cb);
-  label.appendChild(document.createTextNode(d));
-  empDaysDiv.appendChild(label);
-});
-
+const DAY_NAMES = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'];
+function getWeekDates(mondayStr) {
+  const monday = new Date(mondayStr);
+  return Array.from({length:7}, (_,i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}
+function formatDate(d) {
+  return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`;
+}
+let currentWeek = null;
+async function init() {
+  const { data, error } = await sb.from('settings').select('value').eq('key','active_week').single();
+  if (error || !data) {
+    document.getElementById('no-week').style.display = 'block';
+    document.getElementById('main-form').style.display = 'none';
+    return;
+  }
+  currentWeek = data.value;
+  const dates = getWeekDates(currentWeek);
+  document.getElementById('week-label').textContent = `${formatDate(dates[0])} – ${formatDate(dates[6])}`;
+  const container = document.getElementById('days-container');
+  container.innerHTML = '';
+  dates.forEach((date, i) => {
+    const div = document.createElement('div');
+    div.className = 'day-card';
+    div.dataset.index = i;
+    div.innerHTML = `
+      <div class="day-header">
+        <input type="checkbox" class="day-checkbox" data-index="${i}" />
+        <span class="day-name">${DAY_NAMES[i]}</span>
+        <span class="day-date">${formatDate(date)}</span>
+      </div>
+      <div class="day-note">
+        <input type="text" class="day-note-input" placeholder="Poznámka (např. jen od 14h)" style="margin-bottom:0;" />
+      </div>
+    `;
+    const cb = div.querySelector('.day-checkbox');
+    cb.addEventListener('change', () => {
+      div.classList.toggle('selected', cb.checked);
+    });
+    container.appendChild(div);
+  });
+}
 document.getElementById('emp-submit').onclick = async () => {
   const name = document.getElementById('emp-name').value.trim();
   const dept = document.getElementById('emp-dept').value;
@@ -65,22 +123,26 @@ document.getElementById('emp-submit').onclick = async () => {
   const errorEl = document.getElementById('error');
   statusEl.style.display = 'none';
   errorEl.style.display = 'none';
-
-  if (!name) { alert('Vyplň jméno'); return; }
-
-  const off = Array.from(document.querySelectorAll('.off-day')).map(cb => cb.checked);
-
-  const { error } = await sb
-    .from('shift_requests')
-    .upsert({ name, dept, off_days: off }, { onConflict: 'name' });
-
+  if (!name) { alert('Vyplň prosím jméno.'); return; }
+  if (!currentWeek) { alert('Týden není nastaven.'); return; }
+  const days = Array.from(document.querySelectorAll('.day-card')).map((card) => {
+    const cb = card.querySelector('.day-checkbox');
+    const note = card.querySelector('.day-note-input').value.trim();
+    return { available: cb.checked, note };
+  });
+  const { error } = await sb.from('shift_requests').upsert(
+    { name, dept, week: currentWeek, days },
+    { onConflict: 'name,week' }
+  );
   if (error) {
-    errorEl.textContent = 'Chyba: ' + error.message;
+    errorEl.textContent = 'Chyba při ukládání: ' + error.message;
     errorEl.style.display = 'block';
     return;
   }
   statusEl.style.display = 'block';
+  window.scrollTo(0, document.body.scrollHeight);
 };
+init();
 </script>
 </body>
 </html>
