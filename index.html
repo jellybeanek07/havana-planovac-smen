@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zadat volno - Plánovač směn</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; font-family: Arial, sans-serif; }
+  body { margin: 0; padding: 16px; background: #f4f4f4; color: #222; }
+  .container { max-width: 500px; margin: 0 auto; }
+  h1 { font-size: 20px; }
+  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+  input[type=text], select { width: 100%; padding: 10px; margin-bottom: 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+  .days { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .days label { display: flex; align-items: center; gap: 8px; border: 1px solid #ccc; border-radius: 6px; padding: 12px; font-size: 14px; margin: 0; background: #fff; }
+  .days input { width: 18px; height: 18px; }
+  button.primary { width: 100%; padding: 12px; background: #333; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
+  #status { color: green; font-size: 14px; margin-top: 12px; display: none; text-align: center; }
+  #error { color: #b00020; font-size: 13px; margin-top: 12px; display: none; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Zadej svoje volno na příští týden</h1>
+
+  <label>Jméno</label>
+  <input type="text" id="emp-name" placeholder="Tvoje jméno" />
+
+  <label>Oddělení</label>
+  <select id="emp-dept">
+    <option value="bar">Bar</option>
+    <option value="kuchyne">Kuchyně</option>
+  </select>
+
+  <label>Zaškrtni dny, kdy NEMŮŽEŠ (volno):</label>
