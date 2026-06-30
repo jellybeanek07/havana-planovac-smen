@@ -1,0 +1,16 @@
+{
+  "name": "Plánovač směn Havana",
+  "short_name": "Směny",
+  "description": "Plánovač směn pro Havana",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4c5.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    }
+  ]
+}
