@@ -90,15 +90,31 @@
   .wn-desc { font-size: 13px; color: var(--text2); }
   .wn-details { font-size: 12px; color: var(--text2); margin-top: 2px; }
   .weather-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-  .weather-day { flex: 0 0 auto; min-width: 82px; text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 6px; border: 1px solid var(--border); }
+  .weather-day { flex: 0 0 auto; min-width: 82px; text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 6px; border: 1px solid var(--border); cursor: pointer; }
+  .weather-day:hover { border-color: var(--blue); }
   .weather-day.today { border-color: var(--blue); background: var(--blue-bg); }
+  .weather-day.vybrany { border-color: var(--blue); border-width: 2px; box-shadow: 0 0 0 2px var(--blue-bg); }
   .wd-name { font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 2px; }
   .wd-date { font-size: 10px; color: var(--text2); margin-bottom: 4px; }
   .wd-icon { font-size: 26px; line-height: 1; margin-bottom: 4px; }
   .wd-temp { font-size: 13px; font-weight: 700; color: var(--text); }
   .wd-temp span { font-size: 11px; font-weight: 400; color: var(--text2); }
   .wd-rain { font-size: 10px; color: var(--blue); margin-top: 3px; }
+  .wd-okno { font-size: 10px; font-weight: 700; color: var(--blue); background: var(--blue-bg); border-radius: 4px; padding: 1px 3px; margin-top: 3px; }
   .wd-wind { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  /* Hodinový rozpis */
+  .hod-panel { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .hod-hlavicka { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hod-zavrit { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: 5px; cursor: pointer; font-size: 11px; padding: 2px 7px; margin-left: auto; }
+  .hod-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .hod-box { flex: 0 0 auto; width: 58px; text-align: center; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 5px 2px; }
+  .hod-box.prsi { background: var(--blue-bg); border-color: var(--blue); }
+  .hod-cas { font-size: 10px; font-weight: 700; color: var(--text2); }
+  .hod-ikona { font-size: 17px; line-height: 1.3; }
+  .hod-temp { font-size: 11px; font-weight: 700; color: var(--text); }
+  .hod-srazky { font-size: 9px; color: var(--blue); font-weight: 700; min-height: 12px; }
+  .hod-legenda { font-size: 10px; color: var(--text2); margin-top: 7px; }
   #weather-error { font-size: 13px; color: var(--red); background: var(--red-bg); border: 1px solid var(--red); border-radius: 8px; padding: 10px; }
   #weather-error code { font-family: monospace; font-size: 11px; background: rgba(0,0,0,0.1); padding: 2px 5px; border-radius: 3px; word-break: break-all; }
 </style>
@@ -259,7 +275,7 @@ async function loadAll() {
     scheduleData[s.week][s.name] = s.shifts;
   });
   renderTabs();
-  if (currentWeek) { renderRequests(); renderSchedule(); }
+  if (currentWeek) { renderRequests(); renderSchedule(); kresliPocasi(); }
   updateNotif();
 }
 
@@ -298,7 +314,7 @@ document.getElementById('set-week-btn').onclick = async () => {
   if (d.getDay() !== 1) { alert('Vyber prosím pondělí!'); return; }
   currentWeek = val;
   await sb.from('settings').upsert({key:'active_week',value:val},{onConflict:'key'});
-  updateBadge(); renderTabs(); renderRequests(); renderSchedule(); updateNotif();
+  updateBadge(); renderTabs(); renderRequests(); renderSchedule(); updateNotif(); kresliPocasi();
 };
 
 document.getElementById('save-min-btn').onclick = async () => {
@@ -333,7 +349,7 @@ function renderTabs() {
       updateBadge();
       document.querySelectorAll('.week-tab').forEach(t=>t.classList.remove('active'));
       btn.classList.add('active');
-      renderRequests(); renderSchedule();
+      renderRequests(); renderSchedule(); kresliPocasi();
     };
     c.appendChild(btn);
   });
@@ -554,66 +570,185 @@ const WMO_DESC = {
 const DAY_CZ = ['Ne','Po','Út','St','Čt','Pá','So'];
 const WIND_DIRS = ['S','SV','V','JV','J','JZ','Z','SZ'];
 
-function renderWeather(cur, daily, zdroj) {
-  const todayStr = new Date().toISOString().split('T')[0];
+let weatherData = null;      // { current, daily, source } ze serveru
+let rozbalenyDen = null;     // datum dne s otevřeným hodinovým rozpisem
+
+// Najde souvislé úseky, kdy prší. Vrací např. [['13:00','16:00']]
+function oknaDeste(hodiny) {
+  if (!hodiny || !hodiny.length) return [];
+  const okna = [];
+  let start = null, konec = null;
+  hodiny.forEach(h => {
+    const prsi = (h.rain > 0.05) || (h.rainProb != null && h.rainProb >= 50);
+    if (prsi) {
+      if (start === null) start = h.cas;
+      konec = h.cas;
+    } else if (start !== null) {
+      okna.push([start, konec]); start = null;
+    }
+  });
+  if (start !== null) okna.push([start, konec]);
+  return okna;
+}
+
+// [['13:00','16:00']] → "13–17 h"  (konec je začátek poslední deštivé hodiny, proto +1)
+function popisOken(okna) {
+  if (!okna.length) return '';
+  return okna.map(o =>
+    parseInt(o[0].slice(0,2),10) + '–' + (parseInt(o[1].slice(0,2),10) + 1)
+  ).join(', ') + ' h';
+}
+
+// Hodinový rozpis jednoho dne
+function hodinovyPanel(den, sNadpisem) {
+  const hodiny = (den.hodiny || []).filter(h => {
+    const hh = parseInt(h.cas.slice(0,2), 10);
+    return hh >= 6 && hh <= 23;   // provozní hodiny, ať to není zbytečně dlouhé
+  });
+  if (!hodiny.length) return '';
+
+  const datum = new Date(den.date + 'T00:00:00');
+  const okna = oknaDeste(den.hodiny);
+
+  let html = '<div class="hod-panel">';
+  if (sNadpisem) {
+    html += `<div class="hod-hlavicka">
+      <span>🕐 ${DAY_CZ[datum.getDay()]} ${datum.getDate()}.${datum.getMonth()+1}. – hodinový rozpis</span>
+      ${okna.length ? `<span class="wd-okno">🌧️ déšť ${popisOken(okna)}</span>` : '<span style="color:var(--green); font-size:11px;">✓ bez deště</span>'}
+      <button class="hod-zavrit" id="hod-zavrit-btn">✕ Zavřít</button>
+    </div>`;
+  }
+  html += '<div class="hod-grid">';
+  hodiny.forEach(h => {
+    const prsi = (h.rain > 0.05) || (h.rainProb != null && h.rainProb >= 50);
+    html += `
+      <div class="hod-box${prsi ? ' prsi' : ''}">
+        <div class="hod-cas">${h.cas.slice(0,2)}</div>
+        <div class="hod-ikona">${WMO_ICONS[h.code] || '🌡️'}</div>
+        <div class="hod-temp">${Math.round(h.temp)}°</div>
+        <div class="hod-srazky">${h.rain > 0.05 ? h.rain.toFixed(1) : (h.rainProb >= 50 ? h.rainProb + '%' : '')}</div>
+      </div>`;
+  });
+  html += '</div><div class="hod-legenda">Modře zvýrazněné hodiny = očekávaný déšť. Číslo dole = mm srážek, nebo pravděpodobnost deště.</div></div>';
+  return html;
+}
+
+// Vykreslí počasí pro právě vybraný týden
+function kresliPocasi() {
+  if (!weatherData) return;
+  const cur = weatherData.current;
   const icon = WMO_ICONS[cur.code] || '🌡️';
   const desc = WMO_DESC[cur.code] || '';
   const windDirStr = WIND_DIRS[Math.round(cur.windDir / 45) % 8] || '';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Dny, které chceme zobrazit = dny vybraného týdne (stejné jako v rozvrhu)
+  let dnyKZobrazeni;
+  let popisTydne = '';
+  if (currentWeek) {
+    const dates = getWeekDates(currentWeek);
+    dnyKZobrazeni = dates.map(d => {
+      const iso = d.getFullYear() + '-'
+        + String(d.getMonth()+1).padStart(2,'0') + '-'
+        + String(d.getDate()).padStart(2,'0');
+      const nalezeno = weatherData.daily.find(x => x.date === iso);
+      return nalezeno || { date: iso, chybi: true };
+    });
+    popisTydne = `${formatDate(dates[0])} – ${formatDate(dates[6])}`;
+  } else {
+    dnyKZobrazeni = weatherData.daily.slice(0, 7);
+  }
+
+  const bezPredpovedi = dnyKZobrazeni.filter(d => d.chybi).length;
 
   let html = `
     <div class="weather-now">
       <div class="wn-icon">${icon}</div>
       <div>
         <div class="wn-temp">${Math.round(cur.temp)}°C</div>
-        <div class="wn-desc">${desc}</div>
+        <div class="wn-desc">${desc} – právě teď</div>
         <div class="wn-details">
           Pocitově: ${Math.round(cur.feels)}°C &nbsp;·&nbsp;
           Vlhkost: ${cur.humidity} % &nbsp;·&nbsp;
           Vítr: ${Math.round(cur.wind)} km/h ${windDirStr}
         </div>
       </div>
-    </div>
-    <div class="weather-grid">`;
+    </div>`;
 
-  daily.forEach(d => {
+  if (popisTydne) {
+    html += `<div style="font-size:12px; color:var(--text2); margin-bottom:7px;">
+      Předpověď pro vybraný týden: <b>${popisTydne}</b></div>`;
+  }
+
+  html += '<div class="weather-grid">';
+  dnyKZobrazeni.forEach(d => {
     const date = new Date(d.date + 'T00:00:00');
     const isToday = d.date === todayStr;
-    const wicon = WMO_ICONS[d.code] || '🌡️';
+    const jmenoDne = DAY_CZ[date.getDay()];
+    const datumTxt = `${date.getDate()}.${date.getMonth()+1}.`;
+
+    if (d.chybi) {
+      html += `
+        <div class="weather-day" style="opacity:0.45; cursor:default;">
+          <div class="wd-name">${jmenoDne}</div>
+          <div class="wd-date">${datumTxt}</div>
+          <div class="wd-icon">–</div>
+          <div class="wd-temp" style="font-size:10px; font-weight:400;">předpověď<br>zatím není</div>
+        </div>`;
+      return;
+    }
+
+    const okna = oknaDeste(d.hodiny);
     html += `
-      <div class="weather-day${isToday ? ' today' : ''}">
-        <div class="wd-name">${isToday ? 'Dnes' : DAY_CZ[date.getDay()]}</div>
-        <div class="wd-date">${date.getDate()}.${date.getMonth()+1}.</div>
-        <div class="wd-icon">${wicon}</div>
+      <div class="weather-day${isToday ? ' today' : ''}${rozbalenyDen === d.date ? ' vybrany' : ''}" data-datum="${d.date}">
+        <div class="wd-name">${isToday ? 'Dnes' : jmenoDne}</div>
+        <div class="wd-date">${datumTxt}</div>
+        <div class="wd-icon">${WMO_ICONS[d.code] || '🌡️'}</div>
         <div class="wd-temp">${Math.round(d.max)}° <span>/ ${Math.round(d.min)}°</span></div>
-        <div class="wd-rain">${d.rain > 0 ? '💧 ' + d.rain.toFixed(1) + ' mm' : '&nbsp;'}</div>
+        ${okna.length
+          ? `<div class="wd-okno">🌧️ ${popisOken(okna)}</div>`
+          : `<div class="wd-rain">${d.rain > 0 ? '💧 ' + d.rain.toFixed(1) + ' mm' : '&nbsp;'}</div>`}
         <div class="wd-wind">💨 ${Math.round(d.wind)} km/h</div>
       </div>`;
   });
-
   html += '</div>';
+
+  // Hodinový rozpis rozbaleného dne
+  if (rozbalenyDen) {
+    const den = weatherData.daily.find(x => x.date === rozbalenyDen);
+    if (den) html += hodinovyPanel(den, true);
+  } else if (!bezPredpovedi) {
+    html += '<div class="hod-legenda">💡 Klikni na den – rozbalí se hodinový rozpis.</div>';
+  }
+
+  if (bezPredpovedi === dnyKZobrazeni.length) {
+    html += `<div style="font-size:12px; color:var(--text2); margin-top:8px;">
+      Tento týden je dál než 16 dní od dneška – tak daleko dopředu předpověď neexistuje.
+      Zkus to znovu, až se týden přiblíží.</div>`;
+  } else if (bezPredpovedi > 0) {
+    html += `<div style="font-size:12px; color:var(--text2); margin-top:8px;">
+      U ${bezPredpovedi} ${bezPredpovedi === 1 ? 'dne' : 'dnů'} předpověď zatím není –
+      sahá jen 16 dní dopředu.</div>`;
+  }
+
   document.getElementById('weather-body').innerHTML = html;
-  document.getElementById('weather-source').textContent = 'Zdroj: ' + zdroj;
+  document.getElementById('weather-source').textContent = 'Zdroj: ' + weatherData.source;
+
+  // Kliknutí na den = rozbalit / sbalit
+  document.querySelectorAll('.weather-day[data-datum]').forEach(el => {
+    el.onclick = () => {
+      rozbalenyDen = (rozbalenyDen === el.dataset.datum) ? null : el.dataset.datum;
+      kresliPocasi();
+    };
+  });
+  const zavrit = document.getElementById('hod-zavrit-btn');
+  if (zavrit) zavrit.onclick = e => { e.stopPropagation(); rozbalenyDen = null; kresliPocasi(); };
 }
 
 async function loadWeather() {
   document.getElementById('weather-body').innerHTML =
     '<div style="font-size:13px; color:var(--text2);">Načítám počasí…</div>';
   const chyby = [];
-
-  // Převede odpověď Open-Meteo do našeho formátu a vykreslí
-  const zpracujOpenMeteo = (d, zdroj) => {
-    renderWeather(
-      { temp: d.current.temperature_2m, feels: d.current.apparent_temperature,
-        humidity: d.current.relative_humidity_2m, code: d.current.weather_code,
-        wind: d.current.wind_speed_10m, windDir: d.current.wind_direction_10m },
-      d.daily.time.map((t, i) => ({
-        date: t, code: d.daily.weather_code[i],
-        max: d.daily.temperature_2m_max[i], min: d.daily.temperature_2m_min[i],
-        rain: d.daily.precipitation_sum[i], wind: d.daily.wind_speed_10m_max[i]
-      })),
-      zdroj
-    );
-  };
 
   // ── Zdroj 1: vlastní serverová funkce (/api/weather) ──
   // Stejná doména = žádný CORS. Server umí přečíst i chybové odpovědi
@@ -624,59 +759,54 @@ async function loadWeather() {
     if (!res.ok || !d || d.error) {
       throw new Error((d && d.error) || ('HTTP ' + res.status));
     }
-    renderWeather(d.current, d.daily, d.source);
+    weatherData = d;
+    kresliPocasi();
     return;
   } catch(e) {
     chyby.push('/api/weather: ' + e.message);
     console.warn('/api/weather selhal:', e);
   }
 
-  // ── Zdroj 2: Open-Meteo napřímo ──
+  // ── Zdroj 2: Open-Meteo napřímo (bez hodinových dat, jen záchrana) ──
   try {
     const url = 'https://api.open-meteo.com/v1/forecast'
       + '?latitude=49.4828&longitude=16.7625'
       + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m'
+      + '&hourly=temperature_2m,precipitation,precipitation_probability,weather_code'
       + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
-      + '&timezone=auto&forecast_days=7';
+      + '&timezone=auto&forecast_days=16';
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
-    zpracujOpenMeteo(d, 'Open-Meteo.com');
+    if (d.error) throw new Error(d.reason || 'chyba API');
+
+    const hodinyPodleDne = {};
+    (d.hourly?.time || []).forEach((t, i) => {
+      const datum = t.slice(0,10);
+      (hodinyPodleDne[datum] = hodinyPodleDne[datum] || []).push({
+        cas: t.slice(11,16), temp: d.hourly.temperature_2m[i],
+        code: d.hourly.weather_code[i], rain: d.hourly.precipitation[i],
+        rainProb: d.hourly.precipitation_probability?.[i] ?? null
+      });
+    });
+
+    weatherData = {
+      source: 'Open-Meteo.com (napřímo)',
+      current: { temp: d.current.temperature_2m, feels: d.current.apparent_temperature,
+        humidity: d.current.relative_humidity_2m, code: d.current.weather_code,
+        wind: d.current.wind_speed_10m, windDir: d.current.wind_direction_10m },
+      daily: d.daily.time.map((t, i) => ({
+        date: t, code: d.daily.weather_code[i],
+        max: d.daily.temperature_2m_max[i], min: d.daily.temperature_2m_min[i],
+        rain: d.daily.precipitation_sum[i], wind: d.daily.wind_speed_10m_max[i],
+        hodiny: hodinyPodleDne[t] || []
+      }))
+    };
+    kresliPocasi();
     return;
   } catch(e) {
     chyby.push('Open-Meteo: ' + e.message);
     console.warn('Open-Meteo selhal:', e);
-  }
-
-  // ── Zdroj 2: wttr.in ──
-  try {
-    const res = await fetch('https://wttr.in/49.4828,16.7625?format=j1');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const d = await res.json();
-    const c = d.current_condition[0];
-    const W2M = { 113:0, 116:2, 119:3, 122:3, 143:45, 176:80, 179:71, 182:66, 185:56,
-      200:95, 227:73, 230:75, 248:45, 260:48, 263:51, 266:53, 281:56, 284:57,
-      293:61, 296:61, 299:63, 302:63, 305:65, 308:65, 311:66, 314:67, 317:66,
-      320:73, 323:71, 326:71, 329:73, 332:75, 335:75, 338:75, 350:77, 353:80,
-      356:81, 359:82, 362:85, 365:85, 368:85, 371:86, 374:66, 377:67,
-      386:95, 389:96, 392:95, 395:86 };
-    renderWeather(
-      { temp: +c.temp_C, feels: +c.FeelsLikeC, humidity: +c.humidity,
-        code: W2M[+c.weatherCode] ?? 3, wind: +c.windspeedKmph,
-        windDir: +c.winddirDegree },
-      d.weather.slice(0, 7).map(day => ({
-        date: day.date,
-        code: W2M[+(day.hourly[4]?.weatherCode || 113)] ?? 3,
-        max: +day.maxtempC, min: +day.mintempC,
-        rain: day.hourly.reduce((s, h) => s + parseFloat(h.precipMM || 0), 0),
-        wind: Math.max(...day.hourly.map(h => +h.windspeedKmph || 0))
-      })),
-      'wttr.in'
-    );
-    return;
-  } catch(e) {
-    chyby.push('wttr.in: ' + e.message);
-    console.warn('wttr.in selhal:', e);
   }
 
   // ── Všechny zdroje selhaly – ukážeme PŘESNOU chybu na stránce ──
@@ -689,8 +819,8 @@ async function loadWeather() {
       <b>Co která chyba znamená:</b><br>
       • <code>/api/weather: HTTP 404</code> – v repozitáři chybí soubor
         <code>api/weather.js</code>.<br>
-      • <code>Failed to fetch</code> u přímých zdrojů je normální – při chybě
-        neposílají CORS hlavičku. Řeší to právě <code>/api/weather</code>.<br>
+      • <code>Failed to fetch</code> u přímého zdroje je normální – při chybě
+        neposílá CORS hlavičku. Řeší to právě <code>/api/weather</code>.<br>
       • <code>overloaded</code> – zdroje mají výpadek, zkus to za pár minut
         tlačítkem 🔄.
       <br><br>
@@ -702,30 +832,94 @@ async function loadWeather() {
 
 document.getElementById('weather-reload-btn').onclick = loadWeather;
 
-// ── Export počasí jako obrázek ──
+// ── Export počasí jako obrázek – rozbalí VŠECHNY dny ──
 document.getElementById('weather-export-btn').onclick = async () => {
   const btn = document.getElementById('weather-export-btn');
-  const card = document.getElementById('weather-card');
-  if (!card.querySelector('.weather-grid')) {
-    alert('Nejdřív musí být počasí načteno.');
-    return;
-  }
+  if (!weatherData) { alert('Nejdřív musí být počasí načteno.'); return; }
+
   const orig = btn.textContent;
   btn.textContent = '⏳ Generuji…';
   btn.disabled = true;
 
-  // Skryjeme tlačítka aby nebyla na obrázku
-  const btnRow = btn.parentElement.parentElement;
-  btnRow.style.visibility = 'hidden';
+  // Postavíme si zvláštní rozvržení pro export – všechny dny i s hodinami
+  const box = document.createElement('div');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  box.style.cssText = `position:fixed; top:-99999px; left:0; width:1000px; padding:20px;
+    background:${isDark ? '#1e1e2e' : '#ffffff'}; color:${isDark ? '#e0e0e0' : '#1a1a1a'};
+    font-family:Arial, sans-serif;`;
+
+  const dates = currentWeek ? getWeekDates(currentWeek) : null;
+  const nadpis = dates
+    ? `Počasí Suchý u Boskovic: ${formatDate(dates[0])} – ${formatDate(dates[6])}`
+    : 'Počasí – Suchý u Boskovic';
+
+  let html = `<div style="font-size:20px; font-weight:700; margin-bottom:4px;">🌤️ ${nadpis}</div>
+    <div style="font-size:12px; color:#888; margin-bottom:16px;">
+      Nadmořská výška 663 m · Zdroj: ${weatherData.source} ·
+      Staženo ${new Date().toLocaleString('cs-CZ')}</div>`;
+
+  const seznamDnu = dates
+    ? dates.map(d => {
+        const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')
+          + '-' + String(d.getDate()).padStart(2,'0');
+        return weatherData.daily.find(x => x.date === iso) || { date: iso, chybi: true };
+      })
+    : weatherData.daily.slice(0, 7);
+
+  seznamDnu.forEach(den => {
+    const dt = new Date(den.date + 'T00:00:00');
+    const hlavicka = `${DAY_FULL[(dt.getDay()+6)%7]} ${dt.getDate()}.${dt.getMonth()+1}.`;
+
+    if (den.chybi) {
+      html += `<div style="margin-bottom:10px; padding:10px; border:1px solid #ddd; border-radius:8px; opacity:0.5;">
+        <b>${hlavicka}</b> – předpověď zatím není (sahá jen 16 dní dopředu)</div>`;
+      return;
+    }
+
+    const okna = oknaDeste(den.hodiny);
+    html += `<div style="margin-bottom:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <span style="font-size:24px;">${WMO_ICONS[den.code] || '🌡️'}</span>
+        <b style="font-size:15px;">${hlavicka}</b>
+        <span style="font-size:14px;">${Math.round(den.max)}° / ${Math.round(den.min)}°</span>
+        <span style="font-size:12px; color:#888;">💨 ${Math.round(den.wind)} km/h</span>
+        ${okna.length
+          ? `<span style="background:#dbeafe; color:#1d4ed8; font-weight:700; font-size:12px; padding:3px 8px; border-radius:5px;">🌧️ Déšť ${popisOken(okna)} · celkem ${den.rain.toFixed(1)} mm</span>`
+          : '<span style="color:#1a7a40; font-weight:700; font-size:12px;">✓ Bez deště</span>'}
+      </div>`;
+
+    const hodiny = (den.hodiny || []).filter(h => {
+      const hh = parseInt(h.cas.slice(0,2),10); return hh >= 6 && hh <= 23;
+    });
+    if (hodiny.length) {
+      html += '<div style="display:flex; flex-wrap:wrap; gap:3px;">';
+      hodiny.forEach(h => {
+        const prsi = (h.rain > 0.05) || (h.rainProb != null && h.rainProb >= 50);
+        html += `<div style="width:47px; text-align:center; padding:3px 1px; border-radius:5px;
+          background:${prsi ? '#dbeafe' : (isDark ? '#0f0f1a' : '#f5f5f5')};
+          border:1px solid ${prsi ? '#1d4ed8' : '#e0e0e0'};">
+          <div style="font-size:9px; color:#888; font-weight:700;">${h.cas.slice(0,2)}</div>
+          <div style="font-size:14px;">${WMO_ICONS[h.code] || '🌡️'}</div>
+          <div style="font-size:10px; font-weight:700;">${Math.round(h.temp)}°</div>
+          <div style="font-size:8px; color:#1d4ed8; font-weight:700; min-height:10px;">${
+            h.rain > 0.05 ? h.rain.toFixed(1) : (h.rainProb >= 50 ? h.rainProb + '%' : '')
+          }</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+
+  box.innerHTML = html;
+  document.body.appendChild(box);
 
   try {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const canvas = await html2canvas(card, {
-      backgroundColor: isDark ? '#1e1e2e' : '#ffffff',
-      scale: 2
+    const canvas = await html2canvas(box, {
+      backgroundColor: isDark ? '#1e1e2e' : '#ffffff', scale: 2
     });
     const link = document.createElement('a');
-    link.download = `pocasi_suchy_${new Date().toISOString().split('T')[0]}.png`;
+    link.download = `pocasi_suchy_${currentWeek || new Date().toISOString().split('T')[0]}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   } catch(e) {
@@ -733,7 +927,7 @@ document.getElementById('weather-export-btn').onclick = async () => {
     console.error(e);
   }
 
-  btnRow.style.visibility = 'visible';
+  document.body.removeChild(box);
   btn.textContent = orig;
   btn.disabled = false;
 };
