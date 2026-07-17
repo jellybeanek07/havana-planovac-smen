@@ -21,8 +21,9 @@ async function zkusOpenMeteo() {
   const url = 'https://api.open-meteo.com/v1/forecast'
     + '?latitude=' + LAT + '&longitude=' + LON
     + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m'
+    + '&hourly=temperature_2m,precipitation,precipitation_probability,weather_code'
     + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
-    + '&timezone=auto&forecast_days=7';
+    + '&timezone=auto&forecast_days=16';
 
   const r = await fetch(url);
   const d = await r.json().catch(function () { return null; });
@@ -30,6 +31,23 @@ async function zkusOpenMeteo() {
   // Open-Meteo hlásí chybu buď HTTP kódem, nebo polem "error" v těle
   if (!r.ok || !d || d.error) {
     throw new Error((d && d.reason) || ('HTTP ' + r.status));
+  }
+
+  // Hodinová data rozdělíme podle dnů
+  const hodinyPodleDne = {};
+  if (d.hourly && d.hourly.time) {
+    d.hourly.time.forEach(function (t, i) {
+      const datum = t.slice(0, 10);
+      if (!hodinyPodleDne[datum]) hodinyPodleDne[datum] = [];
+      hodinyPodleDne[datum].push({
+        cas: t.slice(11, 16),
+        temp: d.hourly.temperature_2m[i],
+        code: d.hourly.weather_code[i],
+        rain: d.hourly.precipitation[i],
+        rainProb: d.hourly.precipitation_probability
+          ? d.hourly.precipitation_probability[i] : null
+      });
+    });
   }
 
   return {
@@ -49,7 +67,8 @@ async function zkusOpenMeteo() {
         max: d.daily.temperature_2m_max[i],
         min: d.daily.temperature_2m_min[i],
         rain: d.daily.precipitation_sum[i],
-        wind: d.daily.wind_speed_10m_max[i]
+        wind: d.daily.wind_speed_10m_max[i],
+        hodiny: hodinyPodleDne[t] || []
       };
     })
   };
@@ -101,7 +120,7 @@ async function zkusMetNorway() {
     const datum = bod.time.slice(0, 10);
     const det = bod.data.instant.details;
     if (!dny[datum]) {
-      dny[datum] = { date: datum, max: -99, min: 99, rain: 0, wind: 0, symboly: {} };
+      dny[datum] = { date: datum, max: -99, min: 99, rain: 0, wind: 0, symboly: {}, hodiny: [] };
     }
     const den = dny[datum];
     if (det.air_temperature != null) {
@@ -122,9 +141,21 @@ async function zkusMetNorway() {
     if (hodina >= 11 && hodina <= 14 && h1 && h1.summary) {
       den.symboly[hodina] = h1.summary.symbol_code;
     }
+    // Hodinový záznam – MET je posílá po hodině jen na nejbližší ~2-3 dny,
+    // dál už po 6 hodinách. Co máme, to použijeme.
+    if (h1) {
+      den.hodiny.push({
+        cas: bod.time.slice(11, 16),
+        temp: det.air_temperature,
+        code: symbolNaWmo(h1.summary && h1.summary.symbol_code),
+        rain: (h1.details && h1.details.precipitation_amount) || 0,
+        rainProb: (h1.details && h1.details.probability_of_precipitation != null)
+          ? Math.round(h1.details.probability_of_precipitation) : null
+      });
+    }
   });
 
-  const daily = Object.keys(dny).sort().slice(0, 7).map(function (datum) {
+  const daily = Object.keys(dny).sort().map(function (datum) {
     const den = dny[datum];
     const klice = Object.keys(den.symboly);
     const symbol = klice.length ? den.symboly[klice[0]] : null;
@@ -134,7 +165,8 @@ async function zkusMetNorway() {
       max: Math.round(den.max * 10) / 10,
       min: Math.round(den.min * 10) / 10,
       rain: Math.round(den.rain * 10) / 10,
-      wind: Math.round(den.wind)
+      wind: Math.round(den.wind),
+      hodiny: den.hodiny
     };
   });
 
