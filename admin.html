@@ -82,6 +82,25 @@
   #exp-tbl .exp-bar { background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; }
   #exp-tbl .exp-kuchyne { background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; }
   .notif-dot { background: var(--red); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-left: 6px; }
+
+  /* POČASÍ */
+  .weather-now { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .wn-icon { font-size: 40px; line-height: 1; }
+  .wn-temp { font-size: 28px; font-weight: 700; }
+  .wn-desc { font-size: 13px; color: var(--text2); }
+  .wn-details { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .weather-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .weather-day { flex: 0 0 auto; min-width: 82px; text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 6px; border: 1px solid var(--border); }
+  .weather-day.today { border-color: var(--blue); background: var(--blue-bg); }
+  .wd-name { font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 2px; }
+  .wd-date { font-size: 10px; color: var(--text2); margin-bottom: 4px; }
+  .wd-icon { font-size: 26px; line-height: 1; margin-bottom: 4px; }
+  .wd-temp { font-size: 13px; font-weight: 700; color: var(--text); }
+  .wd-temp span { font-size: 11px; font-weight: 400; color: var(--text2); }
+  .wd-rain { font-size: 10px; color: var(--blue); margin-top: 3px; }
+  .wd-wind { font-size: 10px; color: var(--text2); margin-top: 2px; }
+  #weather-error { font-size: 13px; color: var(--red); background: var(--red-bg); border: 1px solid var(--red); border-radius: 8px; padding: 10px; }
+  #weather-error code { font-family: monospace; font-size: 11px; background: rgba(0,0,0,0.1); padding: 2px 5px; border-radius: 3px; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -107,6 +126,21 @@
   </div>
 
   <div class="container">
+
+    <!-- POČASÍ -->
+    <div class="card" id="weather-card">
+      <h2>🌤️ Počasí – Suchý u Boskovic <span style="font-weight:400; text-transform:none; font-size:12px;">(663 m n.m.)</span></h2>
+      <div id="weather-body">
+        <div style="font-size:13px; color:var(--text2);">Načítám počasí…</div>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px; flex-wrap:wrap; gap:8px;">
+        <div style="font-size:11px; color:var(--text2);" id="weather-source">Zdroj: Open-Meteo.com</div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline" id="weather-reload-btn" style="font-size:12px; padding:6px 12px;">🔄 Načíst znovu</button>
+          <button class="btn btn-export" id="weather-export-btn" style="font-size:12px; padding:6px 12px;">📸 Export počasí</button>
+        </div>
+      </div>
+    </div>
 
     <div class="card">
       <h2>📆 Nastavení týdne</h2>
@@ -495,6 +529,216 @@ document.getElementById('reset-btn').onclick = async () => {
   if (scheduleData[currentWeek]) delete scheduleData[currentWeek];
   renderSchedule();
 };
+
+// ─── POČASÍ – Suchý u Boskovic (49.4828, 16.7625) ─────────────────────────
+const WMO_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️', 45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌧️', 56:'🌧️', 57:'🌧️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️', 66:'🌧️', 67:'🌧️',
+  71:'🌨️', 73:'🌨️', 75:'❄️', 77:'❄️',
+  80:'🌦️', 81:'🌧️', 82:'⛈️', 85:'🌨️', 86:'❄️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️'
+};
+const WMO_DESC = {
+  0:'Jasno', 1:'Převážně jasno', 2:'Polojasno', 3:'Zataženo',
+  45:'Mlha', 48:'Námrazová mlha',
+  51:'Slabé mrholení', 53:'Mrholení', 55:'Silné mrholení',
+  56:'Mrznoucí mrholení', 57:'Silné mrznoucí mrholení',
+  61:'Slabý déšť', 63:'Déšť', 65:'Silný déšť',
+  66:'Mrznoucí déšť', 67:'Silný mrznoucí déšť',
+  71:'Slabé sněžení', 73:'Sněžení', 75:'Silné sněžení', 77:'Sněhové krupky',
+  80:'Přeháňky', 81:'Přeháňky', 82:'Silné přeháňky',
+  85:'Sněhové přeháňky', 86:'Silné sněhové přeháňky',
+  95:'Bouřka', 96:'Bouřka s krupobitím', 99:'Silná bouřka'
+};
+const DAY_CZ = ['Ne','Po','Út','St','Čt','Pá','So'];
+const WIND_DIRS = ['S','SV','V','JV','J','JZ','Z','SZ'];
+
+function renderWeather(cur, daily, zdroj) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const icon = WMO_ICONS[cur.code] || '🌡️';
+  const desc = WMO_DESC[cur.code] || '';
+  const windDirStr = WIND_DIRS[Math.round(cur.windDir / 45) % 8] || '';
+
+  let html = `
+    <div class="weather-now">
+      <div class="wn-icon">${icon}</div>
+      <div>
+        <div class="wn-temp">${Math.round(cur.temp)}°C</div>
+        <div class="wn-desc">${desc}</div>
+        <div class="wn-details">
+          Pocitově: ${Math.round(cur.feels)}°C &nbsp;·&nbsp;
+          Vlhkost: ${cur.humidity} % &nbsp;·&nbsp;
+          Vítr: ${Math.round(cur.wind)} km/h ${windDirStr}
+        </div>
+      </div>
+    </div>
+    <div class="weather-grid">`;
+
+  daily.forEach(d => {
+    const date = new Date(d.date + 'T00:00:00');
+    const isToday = d.date === todayStr;
+    const wicon = WMO_ICONS[d.code] || '🌡️';
+    html += `
+      <div class="weather-day${isToday ? ' today' : ''}">
+        <div class="wd-name">${isToday ? 'Dnes' : DAY_CZ[date.getDay()]}</div>
+        <div class="wd-date">${date.getDate()}.${date.getMonth()+1}.</div>
+        <div class="wd-icon">${wicon}</div>
+        <div class="wd-temp">${Math.round(d.max)}° <span>/ ${Math.round(d.min)}°</span></div>
+        <div class="wd-rain">${d.rain > 0 ? '💧 ' + d.rain.toFixed(1) + ' mm' : '&nbsp;'}</div>
+        <div class="wd-wind">💨 ${Math.round(d.wind)} km/h</div>
+      </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('weather-body').innerHTML = html;
+  document.getElementById('weather-source').textContent = 'Zdroj: ' + zdroj;
+}
+
+async function loadWeather() {
+  document.getElementById('weather-body').innerHTML =
+    '<div style="font-size:13px; color:var(--text2);">Načítám počasí…</div>';
+  const chyby = [];
+
+  // Převede odpověď Open-Meteo do našeho formátu a vykreslí
+  const zpracujOpenMeteo = (d, zdroj) => {
+    renderWeather(
+      { temp: d.current.temperature_2m, feels: d.current.apparent_temperature,
+        humidity: d.current.relative_humidity_2m, code: d.current.weather_code,
+        wind: d.current.wind_speed_10m, windDir: d.current.wind_direction_10m },
+      d.daily.time.map((t, i) => ({
+        date: t, code: d.daily.weather_code[i],
+        max: d.daily.temperature_2m_max[i], min: d.daily.temperature_2m_min[i],
+        rain: d.daily.precipitation_sum[i], wind: d.daily.wind_speed_10m_max[i]
+      })),
+      zdroj
+    );
+  };
+
+  // ── Zdroj 1: vlastní serverová funkce (/api/weather) ──
+  // Stejná doména = žádný CORS. Server umí přečíst i chybové odpovědi
+  // a v případě potřeby sáhne po záložním zdroji. Vrací sjednocený formát.
+  try {
+    const res = await fetch('/api/weather');
+    const d = await res.json().catch(() => null);
+    if (!res.ok || !d || d.error) {
+      throw new Error((d && d.error) || ('HTTP ' + res.status));
+    }
+    renderWeather(d.current, d.daily, d.source);
+    return;
+  } catch(e) {
+    chyby.push('/api/weather: ' + e.message);
+    console.warn('/api/weather selhal:', e);
+  }
+
+  // ── Zdroj 2: Open-Meteo napřímo ──
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast'
+      + '?latitude=49.4828&longitude=16.7625'
+      + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m'
+      + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
+      + '&timezone=auto&forecast_days=7';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    zpracujOpenMeteo(d, 'Open-Meteo.com');
+    return;
+  } catch(e) {
+    chyby.push('Open-Meteo: ' + e.message);
+    console.warn('Open-Meteo selhal:', e);
+  }
+
+  // ── Zdroj 2: wttr.in ──
+  try {
+    const res = await fetch('https://wttr.in/49.4828,16.7625?format=j1');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    const c = d.current_condition[0];
+    const W2M = { 113:0, 116:2, 119:3, 122:3, 143:45, 176:80, 179:71, 182:66, 185:56,
+      200:95, 227:73, 230:75, 248:45, 260:48, 263:51, 266:53, 281:56, 284:57,
+      293:61, 296:61, 299:63, 302:63, 305:65, 308:65, 311:66, 314:67, 317:66,
+      320:73, 323:71, 326:71, 329:73, 332:75, 335:75, 338:75, 350:77, 353:80,
+      356:81, 359:82, 362:85, 365:85, 368:85, 371:86, 374:66, 377:67,
+      386:95, 389:96, 392:95, 395:86 };
+    renderWeather(
+      { temp: +c.temp_C, feels: +c.FeelsLikeC, humidity: +c.humidity,
+        code: W2M[+c.weatherCode] ?? 3, wind: +c.windspeedKmph,
+        windDir: +c.winddirDegree },
+      d.weather.slice(0, 7).map(day => ({
+        date: day.date,
+        code: W2M[+(day.hourly[4]?.weatherCode || 113)] ?? 3,
+        max: +day.maxtempC, min: +day.mintempC,
+        rain: day.hourly.reduce((s, h) => s + parseFloat(h.precipMM || 0), 0),
+        wind: Math.max(...day.hourly.map(h => +h.windspeedKmph || 0))
+      })),
+      'wttr.in'
+    );
+    return;
+  } catch(e) {
+    chyby.push('wttr.in: ' + e.message);
+    console.warn('wttr.in selhal:', e);
+  }
+
+  // ── Všechny zdroje selhaly – ukážeme PŘESNOU chybu na stránce ──
+  document.getElementById('weather-body').innerHTML = `
+    <div id="weather-error">
+      <b>⚠️ Počasí se nepodařilo načíst.</b><br><br>
+      Přesné chyby (pošli mi tento text):<br>
+      ${chyby.map(c => `<code>${c}</code>`).join('<br>')}
+      <br><br>
+      <b>Co která chyba znamená:</b><br>
+      • <code>/api/weather: HTTP 404</code> – v repozitáři chybí soubor
+        <code>api/weather.js</code>.<br>
+      • <code>Failed to fetch</code> u přímých zdrojů je normální – při chybě
+        neposílají CORS hlavičku. Řeší to právě <code>/api/weather</code>.<br>
+      • <code>overloaded</code> – zdroje mají výpadek, zkus to za pár minut
+        tlačítkem 🔄.
+      <br><br>
+      <a href="https://www.meteoblue.com/en/weather/week/such%C3%BD_czechia_3077868" target="_blank" style="color:var(--blue);">
+        Zatím zobrazit počasí na meteoblue →
+      </a>
+    </div>`;
+}
+
+document.getElementById('weather-reload-btn').onclick = loadWeather;
+
+// ── Export počasí jako obrázek ──
+document.getElementById('weather-export-btn').onclick = async () => {
+  const btn = document.getElementById('weather-export-btn');
+  const card = document.getElementById('weather-card');
+  if (!card.querySelector('.weather-grid')) {
+    alert('Nejdřív musí být počasí načteno.');
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Generuji…';
+  btn.disabled = true;
+
+  // Skryjeme tlačítka aby nebyla na obrázku
+  const btnRow = btn.parentElement.parentElement;
+  btnRow.style.visibility = 'hidden';
+
+  try {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const canvas = await html2canvas(card, {
+      backgroundColor: isDark ? '#1e1e2e' : '#ffffff',
+      scale: 2
+    });
+    const link = document.createElement('a');
+    link.download = `pocasi_suchy_${new Date().toISOString().split('T')[0]}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('Export se nepodařil: ' + e.message);
+    console.error(e);
+  }
+
+  btnRow.style.visibility = 'visible';
+  btn.textContent = orig;
+  btn.disabled = false;
+};
+
+loadWeather();
 </script>
 </body>
 </html>
